@@ -99,6 +99,12 @@ type MailCmd struct {
 	Label     LabelCmd         `cmd:"" help:"Manage message labels"`
 	Summarize MailSummarizeCmd `cmd:"" help:"Summarize message for AI processing"`
 	Extract   MailExtractCmd   `cmd:"" help:"Extract structured data from message"`
+	Batch     MailBatchCmd     `cmd:"" help:"Run multiple ops in one IMAP session (JSON on stdin)"`
+}
+
+type MailBatchCmd struct {
+	File        string `help:"Read operations from file instead of stdin" short:"f" type:"existingfile"`
+	StopOnError bool   `help:"Stop executing after first error" name:"stop-on-error"`
 }
 
 type MailSummarizeCmd struct {
