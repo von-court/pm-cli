@@ -189,6 +189,9 @@ type MailListCmd struct {
 	Offset  int    `help:"Skip first N messages" default:"0"`
 	Page    int    `help:"Page number (1-based, combines with limit)" short:"p" default:"0"`
 	Unread  bool   `help:"Only show unread messages"`
+	Flagged bool   `help:"Only show flagged/starred messages"`
+	Fields  string `help:"Comma-separated fields for JSON output (e.g. uid,subject,from_address)"`
+	Compact bool   `help:"Output bare JSON array instead of wrapper object"`
 }
 
 type MailReadCmd struct {

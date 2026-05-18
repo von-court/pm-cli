@@ -120,12 +120,18 @@ pm-cli mail list [flags]
 | `-n, --limit` | Number of messages | 20 |
 | `--offset` | Skip first N messages | 0 |
 | `-p, --page` | Page number (1-based) | 0 |
-| `--unread` | Only show unread messages | false |
+| `--unread` | Only show unread messages (server-side SEARCH) | false |
+| `--flagged` | Only show flagged/starred messages (server-side SEARCH) | false |
+| `--fields` | Comma-separated fields for JSON output | (all) |
+| `--compact` | Output bare JSON array instead of wrapper object | false |
 
 **Pagination:**
 - Use `--offset` to skip messages (e.g., `--offset 20` skips the 20 most recent)
 - Use `--page` for page-based navigation (e.g., `-p 2 -n 20` shows messages 21-40)
 - JSON output includes `offset`, `limit`, and `page` fields
+
+**Fields (for `--fields`):**
+`uid`, `seq`, `from`, `from_address`, `to`, `message_id`, `subject`, `date`, `date_iso`, `seen`, `flagged`
 
 **Examples:**
 ```bash
@@ -133,12 +139,18 @@ pm-cli mail list
 pm-cli mail list -n 50
 pm-cli mail list -m Sent
 pm-cli mail list --unread
+pm-cli mail list --flagged
+pm-cli mail list --unread --flagged    # Unread AND flagged
 pm-cli mail list --json
 
 # Pagination
 pm-cli mail list --offset 20           # Skip 20 most recent
 pm-cli mail list -p 2 -n 20            # Page 2 (messages 21-40)
 pm-cli mail list -p 3 -n 10 --json     # Page 3, 10 per page, JSON output
+
+# Field selection (JSON mode, useful for agents)
+pm-cli mail list --json --fields uid,subject,from_address
+pm-cli mail list --json --fields uid,seen --compact
 ```
 
 ### mail read

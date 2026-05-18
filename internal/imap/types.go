@@ -14,14 +14,25 @@ type MailboxStatus struct {
 }
 
 type MessageSummary struct {
-	UID     uint32 `json:"uid"`
-	SeqNum  uint32 `json:"seq_num"`
-	From    string `json:"from"`
-	Subject string `json:"subject"`
-	Date    string `json:"date"`
-	DateISO string `json:"date_iso,omitempty"`
-	Seen    bool   `json:"seen"`
-	Flagged bool   `json:"flagged"`
+	UID         uint32   `json:"uid"`
+	SeqNum      uint32   `json:"seq_num"`
+	From        string   `json:"from"`
+	FromAddress string   `json:"from_address,omitempty"`
+	To          []string `json:"to,omitempty"`
+	MessageID   string   `json:"message_id,omitempty"`
+	Subject     string   `json:"subject"`
+	Date        string   `json:"date"`
+	DateISO     string   `json:"date_iso,omitempty"`
+	Seen        bool     `json:"seen"`
+	Flagged     bool     `json:"flagged"`
+}
+
+type ListOptions struct {
+	Mailbox     string
+	Limit       int
+	Offset      int
+	UnreadOnly  bool
+	FlaggedOnly bool
 }
 
 type Message struct {
