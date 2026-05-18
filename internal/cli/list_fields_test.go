@@ -52,6 +52,7 @@ func TestFilterMessageFields(t *testing.T) {
 			Subject:     "Hello",
 			To:          []string{"bob@example.com"},
 			MessageID:   "<msg1@example.com>",
+			InReplyTo:   "<msg0@example.com>",
 		},
 	}
 
@@ -77,6 +78,23 @@ func TestFilterMessageFields(t *testing.T) {
 	}
 }
 
+func TestFilterMessageFieldsThreading(t *testing.T) {
+	messages := []imap.MessageSummary{
+		{UID: 1, MessageID: "<a@x.com>"},
+		{UID: 2, MessageID: "<b@x.com>", InReplyTo: "<a@x.com>"},
+	}
+
+	fields := []string{"uid", "message_id", "in_reply_to"}
+	result := filterMessageFields(messages, fields)
+
+	if result[0]["in_reply_to"] != "" {
+		t.Errorf("first message should have empty in_reply_to, got %v", result[0]["in_reply_to"])
+	}
+	if result[1]["in_reply_to"] != "<a@x.com>" {
+		t.Errorf("second message in_reply_to = %v, want <a@x.com>", result[1]["in_reply_to"])
+	}
+}
+
 func TestFilterMessageFieldsAllFields(t *testing.T) {
 	messages := []imap.MessageSummary{
 		{
@@ -86,6 +104,7 @@ func TestFilterMessageFieldsAllFields(t *testing.T) {
 			FromAddress: "test@example.com",
 			To:          []string{"a@b.com"},
 			MessageID:   "<id@example.com>",
+			InReplyTo:   "<parent@example.com>",
 			Subject:     "Test",
 			Date:        "2026-01-01 00:00",
 			DateISO:     "2026-01-01T00:00:00Z",
@@ -96,7 +115,7 @@ func TestFilterMessageFieldsAllFields(t *testing.T) {
 
 	allFields := []string{
 		"uid", "seq", "from", "from_address", "to", "message_id",
-		"subject", "date", "date_iso", "seen", "flagged",
+		"in_reply_to", "subject", "date", "date_iso", "seen", "flagged",
 	}
 	result := filterMessageFields(messages, allFields)
 	row := result[0]

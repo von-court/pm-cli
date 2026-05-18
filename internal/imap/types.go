@@ -20,6 +20,7 @@ type MessageSummary struct {
 	FromAddress string   `json:"from_address,omitempty"`
 	To          []string `json:"to,omitempty"`
 	MessageID   string   `json:"message_id,omitempty"`
+	InReplyTo   string   `json:"in_reply_to,omitempty"`
 	Subject     string   `json:"subject"`
 	Date        string   `json:"date"`
 	DateISO     string   `json:"date_iso,omitempty"`

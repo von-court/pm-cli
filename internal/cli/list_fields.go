@@ -14,6 +14,7 @@ var fieldAccessors = map[string]func(imap.MessageSummary) interface{}{
 	"from_address": func(m imap.MessageSummary) interface{} { return m.FromAddress },
 	"to":           func(m imap.MessageSummary) interface{} { return m.To },
 	"message_id":   func(m imap.MessageSummary) interface{} { return m.MessageID },
+	"in_reply_to":  func(m imap.MessageSummary) interface{} { return m.InReplyTo },
 	"subject":      func(m imap.MessageSummary) interface{} { return m.Subject },
 	"date":         func(m imap.MessageSummary) interface{} { return m.Date },
 	"date_iso":     func(m imap.MessageSummary) interface{} { return m.DateISO },
@@ -54,7 +55,7 @@ func filterMessageFields(messages []imap.MessageSummary, fields []string) []map[
 func validFieldNames() string {
 	names := []string{
 		"uid", "seq", "from", "from_address", "to", "message_id",
-		"subject", "date", "date_iso", "seen", "flagged",
+		"in_reply_to", "subject", "date", "date_iso", "seen", "flagged",
 	}
 	return strings.Join(names, ", ")
 }

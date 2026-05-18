@@ -373,6 +373,11 @@ func (c *Client) ListMessages(opts ListOptions) ([]MessageSummary, error) {
 			to = append(to, addr.Addr())
 		}
 
+		inReplyTo := ""
+		if len(envelope.InReplyTo) > 0 {
+			inReplyTo = envelope.InReplyTo[0]
+		}
+
 		summary := MessageSummary{
 			UID:         uint32(uid),
 			SeqNum:      msg.SeqNum,
@@ -380,6 +385,7 @@ func (c *Client) ListMessages(opts ListOptions) ([]MessageSummary, error) {
 			FromAddress: fromAddress,
 			To:          to,
 			MessageID:   envelope.MessageID,
+			InReplyTo:   inReplyTo,
 			Subject:     envelope.Subject,
 			Date:        date,
 			DateISO:     dateISO,
@@ -721,15 +727,28 @@ func (c *Client) Search(mailbox string, opts SearchOptions) ([]MessageSummary, e
 			}
 		}
 
+		fromAddr := ""
+		if len(envelope.From) > 0 {
+			fromAddr = envelope.From[0].Addr()
+		}
+
+		inReplyTo := ""
+		if len(envelope.InReplyTo) > 0 {
+			inReplyTo = envelope.InReplyTo[0]
+		}
+
 		summary := MessageSummary{
-			UID:     uint32(uid),
-			SeqNum:  msg.SeqNum,
-			From:    fromStr,
-			Subject: envelope.Subject,
-			Date:    envelope.Date.Format("2006-01-02 15:04"),
-			DateISO: envelope.Date.Format(time.RFC3339),
-			Seen:    seen,
-			Flagged: flagged,
+			UID:         uint32(uid),
+			SeqNum:      msg.SeqNum,
+			From:        fromStr,
+			FromAddress: fromAddr,
+			MessageID:   envelope.MessageID,
+			InReplyTo:   inReplyTo,
+			Subject:     envelope.Subject,
+			Date:        envelope.Date.Format("2006-01-02 15:04"),
+			DateISO:     envelope.Date.Format(time.RFC3339),
+			Seen:        seen,
+			Flagged:     flagged,
 		}
 
 		messages = append(messages, summary)
