@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -229,6 +230,10 @@ func (c *Client) SelectMailbox(name string) (*MailboxStatus, error) {
 }
 
 func (c *Client) ListMessages(opts ListOptions) ([]MessageSummary, error) {
+	if opts.Limit <= 0 {
+		opts.Limit = 20
+	}
+
 	status, err := c.SelectMailbox(opts.Mailbox)
 	if err != nil {
 		return nil, err
@@ -398,10 +403,7 @@ func (c *Client) ListMessages(opts ListOptions) ([]MessageSummary, error) {
 }
 
 func sortDescending(nums []uint32) {
-	for i, j := 0, len(nums)-1; i < j; i, j = i+1, j-1 {
-		nums[i], nums[j] = nums[j], nums[i]
-	}
-	// The SEARCH results come in ascending order, so reversing gives descending
+	sort.Slice(nums, func(i, j int) bool { return nums[i] > nums[j] })
 }
 
 func (c *Client) GetMessage(mailbox string, id string) (*Message, error) {
