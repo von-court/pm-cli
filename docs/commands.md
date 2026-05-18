@@ -14,6 +14,12 @@ These flags are available on all commands:
 | `-v, --verbose` | Verbose output |
 | `-q, --quiet` | Suppress non-essential output |
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `PM_CLI_BRIDGE_PASSWORD` | Bridge password, checked before system keyring. Useful for headless/CI environments where keyring is unavailable. For interactive use, the system keyring (set via `config init`) is preferred. |
+
 ---
 
 ## config

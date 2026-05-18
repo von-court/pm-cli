@@ -131,6 +131,9 @@ func (c *Config) SetPassword(password string) error {
 }
 
 func (c *Config) GetPassword() (string, error) {
+	if envPass := os.Getenv("PM_CLI_BRIDGE_PASSWORD"); envPass != "" {
+		return envPass, nil
+	}
 	if c.Bridge.Email == "" {
 		return "", errors.New("email not configured")
 	}

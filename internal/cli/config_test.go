@@ -385,6 +385,8 @@ func TestConfigDoctorSkipsSMTPAuthWhenSMTPPortUnreachable(t *testing.T) {
 	// ".invalid" is reserved and guaranteed to be non-resolvable.
 	cfg.Bridge.SMTPHost = "smtp.invalid"
 	cfg.Bridge.SMTPPort = 1025
+	// Bypass keyring which hangs on D-Bus in CI
+	t.Setenv("PM_CLI_BRIDGE_PASSWORD", "env-secret-123")
 
 	var buf bytes.Buffer
 	formatter := output.New(true, false, false, false)
