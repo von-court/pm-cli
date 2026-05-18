@@ -41,6 +41,8 @@ func TestValidateBatchOp(t *testing.T) {
 		{"move missing to", batchOp{Op: "move", UIDs: []string{"uid:1"}}, true},
 		{"move bad chars", batchOp{Op: "move", UIDs: []string{"uid:1"}, To: "bad{name"}, true},
 		{"flag ok", batchOp{Op: "flag", UIDs: []string{"uid:1"}, Read: true}, false},
+		{"flag no flags", batchOp{Op: "flag", UIDs: []string{"uid:1"}}, true},
+		{"flag star only", batchOp{Op: "flag", UIDs: []string{"uid:1"}, Star: true}, false},
 		{"archive ok", batchOp{Op: "archive", UIDs: []string{"uid:1"}}, false},
 		{"delete ok", batchOp{Op: "delete", UIDs: []string{"uid:1"}}, false},
 	}

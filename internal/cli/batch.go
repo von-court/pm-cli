@@ -135,6 +135,10 @@ func validateBatchOp(index int, op batchOp) error {
 		if err := validateMailboxName(op.To); err != nil {
 			return fmt.Errorf("operation %d (move): %w", index, err)
 		}
+	case "flag":
+		if !op.Read && !op.Unread && !op.Star && !op.Unstar {
+			return fmt.Errorf("operation %d (flag): at least one of read, unread, star, unstar is required", index)
+		}
 	}
 	return nil
 }
