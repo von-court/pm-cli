@@ -512,8 +512,15 @@ func (c *Client) DeleteMessages(mailbox string, ids []string, permanent bool) er
 		Op:    imap.StoreFlagsAdd,
 		Flags: []imap.Flag{imap.FlagDeleted},
 	}, nil)
+	affected := 0
+	for storeCmd.Next() != nil {
+		affected++
+	}
 	if err := storeCmd.Close(); err != nil {
 		return fmt.Errorf("failed to mark message(s) for deletion: %w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("no messages matched the given ID(s) in %s", mailbox)
 	}
 
 	// Expunge if permanent
@@ -546,8 +553,12 @@ func (c *Client) CopyMessages(mailbox string, ids []string, destMailbox string) 
 
 	// Copy to destination (does not delete from source)
 	copyCmd := c.client.Copy(numSet, destMailbox)
-	if _, err := copyCmd.Wait(); err != nil {
+	copyData, err := copyCmd.Wait()
+	if err != nil {
 		return fmt.Errorf("failed to copy messages to %s: %w", destMailbox, err)
+	}
+	if copyData != nil && len(copyData.SourceUIDs) == 0 && len(copyData.DestUIDs) == 0 {
+		return fmt.Errorf("no messages matched the given ID(s) in %s", mailbox)
 	}
 
 	return nil
@@ -566,8 +577,12 @@ func (c *Client) MoveMessages(mailbox string, ids []string, destMailbox string) 
 
 	// Copy to destination
 	copyCmd := c.client.Copy(numSet, destMailbox)
-	if _, err := copyCmd.Wait(); err != nil {
+	copyData, err := copyCmd.Wait()
+	if err != nil {
 		return fmt.Errorf("failed to copy messages to %s: %w", destMailbox, err)
+	}
+	if copyData != nil && len(copyData.SourceUIDs) == 0 && len(copyData.DestUIDs) == 0 {
+		return fmt.Errorf("no messages matched the given ID(s) in %s", mailbox)
 	}
 
 	// Delete from source
@@ -575,6 +590,8 @@ func (c *Client) MoveMessages(mailbox string, ids []string, destMailbox string) 
 		Op:    imap.StoreFlagsAdd,
 		Flags: []imap.Flag{imap.FlagDeleted},
 	}, nil)
+	for storeCmd.Next() != nil {
+	}
 	if err := storeCmd.Close(); err != nil {
 		return fmt.Errorf("failed to delete from source: %w", err)
 	}
