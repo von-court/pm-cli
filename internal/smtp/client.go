@@ -52,6 +52,7 @@ type Message struct {
 	BCC         []string
 	Subject     string
 	Body        string
+	HTMLBody    string
 	Attachments []string
 	InReplyTo   string
 	References  string
@@ -142,6 +143,7 @@ func (c *Client) Send(msg *Message) error {
 
 func (c *Client) writeMessage(w io.Writer, msg *Message) error {
 	hasAttachments := len(msg.Attachments) > 0
+	hasHTML := msg.HTMLBody != ""
 
 	// Headers — sanitize every value for CR/LF. Subject/InReplyTo/References
 	// can carry attacker-controlled data (e.g., the Message-ID of a received
@@ -162,31 +164,107 @@ func (c *Client) writeMessage(w io.Writer, msg *Message) error {
 	}
 	fmt.Fprintf(w, "MIME-Version: 1.0\r\n")
 
-	if !hasAttachments {
+	// No attachments and no HTML - simple plain text message
+	if !hasAttachments && !hasHTML {
 		fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n")
 		fmt.Fprintf(w, "Content-Transfer-Encoding: quoted-printable\r\n")
 		fmt.Fprintf(w, "\r\n")
 		return writeQuotedPrintable(w, msg.Body)
 	}
 
-	// Multipart message with attachments
+	// Multipart message
 	var buf bytes.Buffer
 	mpWriter := multipart.NewWriter(&buf)
 
+	if hasHTML && !hasAttachments {
+		// multipart/alternative: plain text + HTML (no attachments)
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Type", "text/plain; charset=utf-8")
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		part, err := mpWriter.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		if err := writeQuotedPrintable(part, msg.Body); err != nil {
+			return err
+		}
+
+		header.Set("Content-Type", "text/html; charset=utf-8")
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		part, err = mpWriter.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		if err := writeQuotedPrintable(part, msg.HTMLBody); err != nil {
+			return err
+		}
+
+		if err := mpWriter.Close(); err != nil {
+			return fmt.Errorf("failed to finalize message: %w", err)
+		}
+		fmt.Fprintf(w, "Content-Type: multipart/alternative; boundary=%s\r\n", mpWriter.Boundary())
+		fmt.Fprintf(w, "\r\n")
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			return fmt.Errorf("failed to write message body: %w", err)
+		}
+		return nil
+	}
+
+	// Multipart mixed: body + HTML (if present) + attachments
 	fmt.Fprintf(w, "Content-Type: multipart/mixed; boundary=%s\r\n", mpWriter.Boundary())
 	fmt.Fprintf(w, "\r\n")
 
-	// Text body part
-	header := make(textproto.MIMEHeader)
-	header.Set("Content-Type", "text/plain; charset=utf-8")
-	header.Set("Content-Transfer-Encoding", "quoted-printable")
+	if hasHTML {
+		// Create multipart/alternative for text + HTML
+		var altBuf bytes.Buffer
+		altWriter := multipart.NewWriter(&altBuf)
 
-	part, err := mpWriter.CreatePart(header)
-	if err != nil {
-		return err
-	}
-	if err := writeQuotedPrintable(part, msg.Body); err != nil {
-		return err
+		altHeader := make(textproto.MIMEHeader)
+		altHeader.Set("Content-Type", "text/plain; charset=utf-8")
+		altHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+		altPart, err := altWriter.CreatePart(altHeader)
+		if err != nil {
+			return err
+		}
+		if err := writeQuotedPrintable(altPart, msg.Body); err != nil {
+			return err
+		}
+
+		altHeader.Set("Content-Type", "text/html; charset=utf-8")
+		altHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+		altPart, err = altWriter.CreatePart(altHeader)
+		if err != nil {
+			return err
+		}
+		if err := writeQuotedPrintable(altPart, msg.HTMLBody); err != nil {
+			return err
+		}
+		if err := altWriter.Close(); err != nil {
+			return fmt.Errorf("failed to finalize message: %w", err)
+		}
+
+		// Add as a multipart/alternative part
+		partHeader := make(textproto.MIMEHeader)
+		partHeader.Set("Content-Type", fmt.Sprintf("multipart/alternative; boundary=%s", altWriter.Boundary()))
+		part, err := mpWriter.CreatePart(partHeader)
+		if err != nil {
+			return err
+		}
+		if _, err := part.Write(altBuf.Bytes()); err != nil {
+			return fmt.Errorf("failed to write message body: %w", err)
+		}
+	} else {
+		// Plain text body part
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Type", "text/plain; charset=utf-8")
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		part, err := mpWriter.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		if err := writeQuotedPrintable(part, msg.Body); err != nil {
+			return err
+		}
 	}
 
 	// Attachment parts
