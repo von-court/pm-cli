@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
 	"net/smtp"
 	"net/textproto"
@@ -51,6 +52,7 @@ type Message struct {
 	BCC         []string
 	Subject     string
 	Body        string
+	HTMLBody    string
 	Attachments []string
 	InReplyTo   string
 	References  string
@@ -141,6 +143,7 @@ func (c *Client) Send(msg *Message) error {
 
 func (c *Client) writeMessage(w io.Writer, msg *Message) error {
 	hasAttachments := len(msg.Attachments) > 0
+	hasHTML := msg.HTMLBody != ""
 
 	// Headers — sanitize every value for CR/LF. Subject/InReplyTo/References
 	// can carry attacker-controlled data (e.g., the Message-ID of a received
@@ -161,31 +164,94 @@ func (c *Client) writeMessage(w io.Writer, msg *Message) error {
 	}
 	fmt.Fprintf(w, "MIME-Version: 1.0\r\n")
 
-	if !hasAttachments {
+	// No attachments and no HTML - simple plain text message
+	if !hasAttachments && !hasHTML {
 		fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n")
 		fmt.Fprintf(w, "Content-Transfer-Encoding: quoted-printable\r\n")
 		fmt.Fprintf(w, "\r\n")
-		fmt.Fprintf(w, "%s\r\n", msg.Body)
+		qpw := quotedprintable.NewWriter(w)
+		qpw.Write([]byte(msg.Body))
+		qpw.Close()
+		fmt.Fprintf(w, "\r\n")
 		return nil
 	}
 
-	// Multipart message with attachments
+	// Multipart message
 	var buf bytes.Buffer
 	mpWriter := multipart.NewWriter(&buf)
 
+	if hasHTML && !hasAttachments {
+		// multipart/alternative: plain text + HTML (no attachments)
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Type", "text/plain; charset=utf-8")
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		part, err := mpWriter.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		writeQuotedPrintableTo(part, msg.Body)
+
+		header.Set("Content-Type", "text/html; charset=utf-8")
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		part, err = mpWriter.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		writeQuotedPrintableTo(part, msg.HTMLBody)
+
+		mpWriter.Close()
+		fmt.Fprintf(w, "Content-Type: multipart/alternative; boundary=%s\r\n", mpWriter.Boundary())
+		fmt.Fprintf(w, "\r\n")
+		w.Write(buf.Bytes())
+		return nil
+	}
+
+	// Multipart mixed: body + HTML (if present) + attachments
 	fmt.Fprintf(w, "Content-Type: multipart/mixed; boundary=%s\r\n", mpWriter.Boundary())
 	fmt.Fprintf(w, "\r\n")
 
-	// Text body part
-	header := make(textproto.MIMEHeader)
-	header.Set("Content-Type", "text/plain; charset=utf-8")
-	header.Set("Content-Transfer-Encoding", "quoted-printable")
+	if hasHTML {
+		// Create multipart/alternative for text + HTML
+		var altBuf bytes.Buffer
+		altWriter := multipart.NewWriter(&altBuf)
 
-	part, err := mpWriter.CreatePart(header)
-	if err != nil {
-		return err
+		altHeader := make(textproto.MIMEHeader)
+		altHeader.Set("Content-Type", "text/plain; charset=utf-8")
+		altHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+		altPart, err := altWriter.CreatePart(altHeader)
+		if err != nil {
+			return err
+		}
+		writeQuotedPrintableTo(altPart, msg.Body)
+
+		altHeader.Set("Content-Type", "text/html; charset=utf-8")
+		altHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+		altPart, err = altWriter.CreatePart(altHeader)
+		if err != nil {
+			return err
+		}
+		writeQuotedPrintableTo(altPart, msg.HTMLBody)
+		altWriter.Close()
+
+		// Add as a multipart/alternative part
+		partHeader := make(textproto.MIMEHeader)
+		partHeader.Set("Content-Type", fmt.Sprintf("multipart/alternative; boundary=%s", altWriter.Boundary()))
+		part, err := mpWriter.CreatePart(partHeader)
+		if err != nil {
+			return err
+		}
+		part.Write(altBuf.Bytes())
+	} else {
+		// Plain text body part
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Type", "text/plain; charset=utf-8")
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		part, err := mpWriter.CreatePart(header)
+		if err != nil {
+			return err
+		}
+		writeQuotedPrintableTo(part, msg.Body)
 	}
-	part.Write([]byte(msg.Body))
 
 	// Attachment parts
 	for _, attachPath := range msg.Attachments {
@@ -231,6 +297,15 @@ func (c *Client) writeMessage(w io.Writer, msg *Message) error {
 	w.Write(buf.Bytes())
 
 	return nil
+}
+
+// writeQuotedPrintableTo writes content using quoted-printable encoding,
+// wrapping lines at 76 characters (RFC 2045). This ensures no line exceeds
+// the SMTP MaxLineLength limit (2000 chars in Proton Bridge/go-smtp).
+func writeQuotedPrintableTo(w io.Writer, content string) {
+	qpw := quotedprintable.NewWriter(w)
+	qpw.Write([]byte(content))
+	qpw.Close()
 }
 
 // sanitizeAddressList strips CR/LF from each address and joins with ", ".

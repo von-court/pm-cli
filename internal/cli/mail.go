@@ -1084,18 +1084,26 @@ func (c *MailForwardCmd) Run(ctx *Context) error {
 
 	// Get the body text from original message
 	textBody, htmlBody := parseMessageBody(msg.RawBody)
-	originalBody := textBody
-	if originalBody == "" && htmlBody != "" {
-		originalBody = htmlToText(htmlBody)
+	originalTextBody := textBody
+	if originalTextBody == "" && htmlBody != "" {
+		originalTextBody = htmlToText(htmlBody)
 	}
 
-	// Build forwarded message body
+	// Build forwarded message body for plain text
 	forwardHeader := "---------- Forwarded message ----------\n"
 	forwardHeader += "From: " + msg.From + "\n"
 	forwardHeader += "Date: " + msg.Date + "\n"
 	forwardHeader += "Subject: " + msg.Subject + "\n"
 	forwardHeader += "To: " + strings.Join(msg.To, ", ") + "\n"
 	forwardHeader += "\n"
+
+	// Build forwarded message body for HTML
+	forwardHeaderHTML := "<hr><p><b>---------- Forwarded message ----------</b></p>\n"
+	forwardHeaderHTML += "<p><b>From:</b> " + msg.From + "<br>\n"
+	forwardHeaderHTML += "<b>Date:</b> " + msg.Date + "<br>\n"
+	forwardHeaderHTML += "<b>Subject:</b> " + msg.Subject + "<br>\n"
+	forwardHeaderHTML += "<b>To:</b> " + strings.Join(msg.To, ", ") + "</p>\n"
+	forwardHeaderHTML += "<hr>\n"
 
 	// Add user's message if provided
 	body := c.Body
@@ -1113,10 +1121,13 @@ func (c *MailForwardCmd) Run(ctx *Context) error {
 	}
 
 	var fullBody string
+	var fullHTMLBody string
 	if body != "" {
-		fullBody = body + "\n\n" + forwardHeader + originalBody
+		fullBody = body + "\n\n" + forwardHeader + originalTextBody
+		fullHTMLBody = "<p>" + body + "</p>\n" + forwardHeaderHTML + htmlBody
 	} else {
-		fullBody = forwardHeader + originalBody
+		fullBody = forwardHeader + originalTextBody
+		fullHTMLBody = forwardHeaderHTML + htmlBody
 	}
 
 	password, err := ctx.Config.GetPassword()
@@ -1131,6 +1142,7 @@ func (c *MailForwardCmd) Run(ctx *Context) error {
 		To:          c.To,
 		Subject:     subject,
 		Body:        fullBody,
+		HTMLBody:    fullHTMLBody,
 		Attachments: c.Attach,
 	}
 
