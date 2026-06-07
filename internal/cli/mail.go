@@ -1137,6 +1137,12 @@ func (c *MailForwardCmd) Run(ctx *Context) error {
 
 	smtpClient := smtp.NewClient(ctx.Config, password)
 
+	// Build references header for threading
+	references := msg.MessageID
+	if len(msg.References) > 0 {
+		references = strings.Join(msg.References, " ")
+	}
+
 	fwdMsg := &smtp.Message{
 		From:        ctx.Config.Bridge.Email,
 		To:          c.To,
@@ -1144,6 +1150,7 @@ func (c *MailForwardCmd) Run(ctx *Context) error {
 		Body:        fullBody,
 		HTMLBody:    fullHTMLBody,
 		Attachments: c.Attach,
+		References:  references,
 	}
 
 	ctx.Formatter.Verbosef("Forwarding email to %s...", strings.Join(c.To, ", "))
