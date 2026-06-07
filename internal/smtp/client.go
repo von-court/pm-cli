@@ -108,6 +108,11 @@ func (c *Client) Send(msg *Message) error {
 		return fmt.Errorf("failed to set sender: %w", err)
 	}
 
+	// Validate recipients against allowed domains
+	if err := c.validateRecipients(msg); err != nil {
+		return err
+	}
+
 	// Set recipients
 	allRecipients := make([]string, 0, len(msg.To)+len(msg.CC)+len(msg.BCC))
 	allRecipients = append(allRecipients, msg.To...)
@@ -350,6 +355,49 @@ func sanitizeAddressList(addrs []string) string {
 		clean[i] = safetext.SanitizeHeaderValue(a)
 	}
 	return strings.Join(clean, ", ")
+}
+
+// validateRecipients checks that all recipient domains are in the allowed
+// domains list (if configured). An empty allowed list allows all domains.
+func (c *Client) validateRecipients(msg *Message) error {
+	allowed := c.config.Bridge.AllowedDomains
+	if len(allowed) == 0 {
+		return nil // no restriction
+	}
+
+	allRecipients := make([]string, 0, len(msg.To)+len(msg.CC)+len(msg.BCC))
+	allRecipients = append(allRecipients, msg.To...)
+	allRecipients = append(allRecipients, msg.CC...)
+	allRecipients = append(allRecipients, msg.BCC...)
+
+	for _, rcpt := range allRecipients {
+		if !isAllowedDomain(rcpt, allowed) {
+			return fmt.Errorf("domain %q is not in allowed domains list", extractDomain(rcpt))
+		}
+	}
+	return nil
+}
+
+func isAllowedDomain(addr string, allowed []string) bool {
+	at := strings.LastIndex(addr, "@")
+	if at < 0 {
+		return false
+	}
+	domain := strings.ToLower(addr[at+1:])
+	for _, d := range allowed {
+		if domain == strings.ToLower(strings.TrimSpace(d)) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractDomain(addr string) string {
+	at := strings.LastIndex(addr, "@")
+	if at < 0 {
+		return addr
+	}
+	return addr[at+1:]
 }
 
 func encodeSubject(subject string) string {
